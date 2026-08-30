@@ -1,0 +1,41 @@
+.round-screen {
+  display: flex;
+  justify-content: center;
+  margin-top: 2rem;
+}
+
+.round-card {
+  width: 100%;
+  max-width: 800px;
+}
+
+.round-card-content {
+  padding: 2rem;
+}
+
+.score-entry-section {
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+}
+
+.score-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.player-name {
+  font-weight: 600;
+}
+
+.totals-section {
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+}
+
+.total-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}

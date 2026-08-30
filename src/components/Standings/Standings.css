@@ -1,0 +1,42 @@
+.standings-screen {
+  display: flex;
+  justify-content: center;
+  margin-top: 2rem;
+}
+
+.standings-card {
+  width: 100%;
+  max-width: 600px;
+}
+
+.standings-card-content {
+  padding: 2rem;
+}
+
+.standings-list {
+  list-style: none;
+  padding: 0;
+  margin: 1.5rem 0;
+}
+
+.standings-list li {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #eee;
+}
+
+.standings-position {
+  width: 1.5rem;
+  color: #888;
+}
+
+.standings-name {
+  flex: 1;
+}
+
+.standings-winner .standings-name {
+  font-weight: 700;
+  color: #1b8a4c;
+}
