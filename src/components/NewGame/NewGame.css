@@ -1,0 +1,25 @@
+.new-game-card {
+  max-width: 700px;
+  margin: 2rem auto;
+}
+
+.new-game-content {
+  padding: 2rem;
+}
+
+.player-entry-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.players-section {
+  margin-bottom: 2rem;
+}
+
+.player-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+}

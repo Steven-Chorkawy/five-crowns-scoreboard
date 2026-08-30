@@ -1,20 +1,27 @@
 import { JSX } from "react/jsx-runtime";
 import "./App.css";
 
-/**
- * Root component for the Five Crowns Scoreboard.
- *
- * This temporary page verifies that React, TypeScript, Vite, and the project
- * structure are working before the KendoReact user interface is introduced.
- *
- * @returns The initial project validation screen.
- */
+import { NewGame } from "./components/NewGame/NewGame";
+
 function App(): JSX.Element {
+
+  const handleStartGame = (
+    playerNames: string[]
+  ): void => {
+
+    console.clear();
+
+    console.log(
+      "Starting game with players:",
+      playerNames
+    );
+  };
+
   return (
     <div className="app-container">
-      <h1>Five Crowns Scoreboard</h1>
-
-      <p>Project setup complete.</p>
+      <NewGame
+        onStartGame={handleStartGame}
+      />
     </div>
   );
 }
