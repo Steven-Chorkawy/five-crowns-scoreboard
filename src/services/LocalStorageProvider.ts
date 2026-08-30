@@ -87,4 +87,8 @@ export class LocalStorageProvider implements IStorageProvider {
             JSON.stringify(games)
         );
     }
+
+    public hasSavedGames(): boolean {
+        return this.getGames().length > 0;
+    }
 }
