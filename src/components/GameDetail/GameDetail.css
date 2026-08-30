@@ -1,0 +1,61 @@
+.game-detail-screen {
+    display: flex;
+    justify-content: center;
+    margin-top: 1.5rem;
+}
+
+.game-detail-card {
+    width: 100%;
+    max-width: 900px;
+}
+
+.game-detail-content {
+    padding: 1.5rem;
+}
+
+.game-detail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.game-detail-meta {
+    color: #666;
+    margin-top: 0;
+}
+
+.breakdown-title {
+    margin-top: 1.5rem;
+}
+
+/* Horizontal scroll on small screens rather than squashing columns. */
+.breakdown-table-wrap {
+    overflow-x: auto;
+}
+
+.breakdown-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.breakdown-table th,
+.breakdown-table td {
+    border-bottom: 1px solid #eee;
+    padding: 0.4rem 0.6rem;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.num-cell {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.total-cell {
+    font-weight: 700;
+}
+
+.hint-text {
+    color: #888;
+}

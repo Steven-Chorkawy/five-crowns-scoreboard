@@ -8,6 +8,7 @@ import { NewGame } from "./components/NewGame/NewGame";
 import { RoundScreen } from "./components/RoundScreen/RoundScreen";
 import { Standings } from "./components/Standings/Standings";
 import { History } from "./components/History/History";
+import { GameDetail } from "./components/GameDetail/GameDetail";
 
 import { IPlayer } from "./models/IPlayer";
 import { IGame } from "./models/IGame";
@@ -21,7 +22,7 @@ import { SessionState } from "./state/SessionState";
 const storageProvider = new CompositeProvider();
 
 /** The screen the user is currently looking at. */
-type AppView = "setup" | "playing" | "complete" | "history";
+type AppView = "setup" | "playing" | "complete" | "history" | "detail";
 
 /** Status of the most recent cloud save, shown in the header. */
 type SaveStatus = "idle" | "saving" | "saved" | "error";
@@ -36,6 +37,7 @@ function App(): JSX.Element {
   const [activeGame, setActiveGame] = useState<IGame | null>(null);
   const [historyGames, setHistoryGames] = useState<IGame[]>([]);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [detailGame, setDetailGame] = useState<IGame | null>(null);
 
   /**
    * Persists a game and updates the save-status indicator. Local always
@@ -212,6 +214,32 @@ function App(): JSX.Element {
   };
 
   /**
+   * Opens the read-only detail/chart view for a game from History. Does not
+   * touch the active game or the session pointer.
+   */
+  const handleViewDetails = (id: string): void => {
+    const load = async (): Promise<void> => {
+      const game: IGame | null = await storageProvider.loadGame(id);
+
+      if (game) {
+        setDetailGame(game);
+        setView("detail");
+      }
+    };
+
+    void load();
+  };
+
+  /**
+   * Returns from the detail view back to the History list.
+   */
+  const handleBackToHistory = (): void => {
+    setDetailGame(null);
+    handleShowHistory();
+  };
+
+
+  /**
    * Maps the current save status to short header text.
    */
   const renderSaveStatus = (): string => {
@@ -258,7 +286,12 @@ function App(): JSX.Element {
             onResume={handleResumeGame}
             onDelete={handleDeleteGame}
             onBack={handleNewGame}
+            onViewDetails={handleViewDetails}
           />
+        )}
+
+        {view === "detail" && detailGame && (
+          <GameDetail game={detailGame} onBack={handleBackToHistory} />
         )}
 
         {view === "complete" && activeGame && (

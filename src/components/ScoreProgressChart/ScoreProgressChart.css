@@ -1,0 +1,8 @@
+.score-progress-chart {
+    margin-top: 1.5rem;
+}
+
+/* Give the chart a sensible height; Kendo fills its container width. */
+.score-progress-chart .k-chart {
+    height: 320px;
+}

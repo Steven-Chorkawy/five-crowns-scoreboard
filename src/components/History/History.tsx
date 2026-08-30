@@ -23,6 +23,9 @@ export interface IHistoryProps {
 
     /** Raised to return to the New Game screen. */
     onBack: () => void;
+
+    /** Raised to open the read-only detail/chart view for a game. */
+    onViewDetails: (id: string) => void;
 }
 
 /**
@@ -92,6 +95,15 @@ export const History: React.FC<IHistoryProps> = (props) => {
                                 </Button>
 
                                 <Button
+                                    themeColor="info"
+                                    fillMode="outline"
+                                    size="small"
+                                    onClick={() => props.onViewDetails(summary.id)}
+                                >
+                                    Details
+                                </Button>
+
+                                <Button
                                     themeColor="error"
                                     fillMode="outline"
                                     size="small"
@@ -100,7 +112,6 @@ export const History: React.FC<IHistoryProps> = (props) => {
                                     Delete
                                 </Button>
                             </div>
-
                         </div>
                     ))}
 
