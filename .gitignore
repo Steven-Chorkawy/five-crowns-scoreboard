@@ -26,3 +26,6 @@ dist-ssr
 # KendoReact license - never commit this
 kendo-ui-license.txt
 .kendo-ui-license
+
+.env.local
+.env.*.local
