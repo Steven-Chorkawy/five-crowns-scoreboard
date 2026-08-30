@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# KendoReact license - never commit this
+kendo-ui-license.txt
+.kendo-ui-license
