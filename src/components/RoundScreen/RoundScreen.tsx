@@ -17,27 +17,32 @@ import "./RoundScreen.css";
  * Props for the RoundScreen component.
  */
 export interface IRoundScreenProps {
-  /** The active, in-progress game. */
   game: IGame;
 
-  /** Raised with one score per player when the round is saved. */
-  onSaveRound: (scores: IScore[]) => void;
+  /**
+   * Raised when the round is saved.
+   *
+   * @param scores - One score per player.
+   * @param wentOutPlayerId - Player who went out first, or null.
+   */
+  onSaveRound: (scores: IScore[], wentOutPlayerId: string | null) => void;
 }
 
 /**
- * Lets the user enter each player's score for the current round, shows running
- * totals, and saves the round. When the final round is reached the primary
- * button reads "Finish Game" instead of "Save Round".
+ * Score entry for the current round, showing the dealer and letting the user
+ * mark who went out first.
  */
 export const RoundScreen: React.FC<IRoundScreenProps> = (props) => {
 
-  // Score being entered for each player this round, keyed by player id.
   const [roundScores, setRoundScores] =
     useState<Record<string, number>>({});
 
+  const [wentOutPlayerId, setWentOutPlayerId] =
+    useState<string | null>(null);
+
   /**
-   * Reset the per-player entry values to 0 whenever the round changes so the
-   * previous round's numbers do not carry over into the next round.
+   * Reset per-player values and the went-out selection whenever the round
+   * changes.
    */
   useEffect((): void => {
     const startingScores: Record<string, number> = {};
@@ -47,24 +52,38 @@ export const RoundScreen: React.FC<IRoundScreenProps> = (props) => {
     });
 
     setRoundScores(startingScores);
+    setWentOutPlayerId(null);
   }, [props.game.currentRound, props.game.players]);
 
   /**
-   * Updates the entry value for a single player.
-   *
-   * Uses a computed key ([playerId]) so each player's value is stored against
-   * their own id. (The original bug used the shorthand `score`, which wrote
-   * every player to a single key named "score".)
+   * Updates a single player's entry value (computed key so each player maps to
+   * their own id).
    */
   const updateScore = (playerId: string, score: number): void => {
-    setRoundScores((previousScores) => ({
-      ...previousScores,
+    setRoundScores((previous) => ({
+      ...previous,
       [playerId]: score
     }));
   };
 
   /**
-   * Builds an IScore per player for the current round and raises onSaveRound.
+   * Toggles which player went out first. Selecting a player also sets their
+   * score to 0 for convenience (going out scores zero); it stays editable.
+   * Clicking the already-selected player clears the selection.
+   */
+  const markWentOut = (playerId: string): void => {
+    setWentOutPlayerId((current) => {
+      if (current === playerId) {
+        return null;
+      }
+
+      updateScore(playerId, 0);
+      return playerId;
+    });
+  };
+
+  /**
+   * Builds scores + went-out result and raises onSaveRound.
    */
   const saveRound = (): void => {
     const scores: IScore[] = props.game.players.map(
@@ -75,11 +94,13 @@ export const RoundScreen: React.FC<IRoundScreenProps> = (props) => {
       })
     );
 
-    props.onSaveRound(scores);
+    props.onSaveRound(scores, wentOutPlayerId);
   };
 
   const wildCard: string = GameService.getWildCard(props.game.currentRound);
   const isFinalRound: boolean = GameService.isLastRound(props.game.currentRound);
+  const dealer: IPlayer | null =
+    GameService.getDealer(props.game, props.game.currentRound);
 
   return (
     <div className="round-screen">
@@ -89,22 +110,47 @@ export const RoundScreen: React.FC<IRoundScreenProps> = (props) => {
           <h2>Round {props.game.currentRound} of {GameService.TOTAL_ROUNDS}</h2>
           <h3>Wild Card: {wildCard}</h3>
 
-          <div className="score-entry-section">
-            {props.game.players.map((player: IPlayer) => (
-              <div key={player.id} className="score-row">
-                <span className="player-name">{player.name}</span>
+          {dealer && (
+            <p className="dealer-line">
+              Dealer: <strong>{dealer.name}</strong>
+            </p>
+          )}
 
-                <NumericTextBox
-                  width="150px"
-                  min={0}
-                  max={500}
-                  value={roundScores[player.id] ?? 0}
-                  onChange={(event: NumericTextBoxChangeEvent): void => {
-                    updateScore(player.id, Number(event.value ?? 0));
-                  }}
-                />
-              </div>
-            ))}
+          <div className="score-entry-section">
+            {props.game.players.map((player: IPlayer) => {
+              const isWentOut: boolean = wentOutPlayerId === player.id;
+
+              return (
+                <div
+                  key={player.id}
+                  className={`score-row ${isWentOut ? "went-out" : ""}`}
+                >
+                  <span className="player-name">{player.name}</span>
+
+                  <div className="score-row-controls">
+                    <Button
+                      size="small"
+                      fillMode={isWentOut ? "solid" : "outline"}
+                      themeColor={isWentOut ? "success" : "base"}
+                      onClick={() => markWentOut(player.id)}
+                      title="Mark this player as going out first"
+                    >
+                      Went out
+                    </Button>
+
+                    <NumericTextBox
+                      width="120px"
+                      min={0}
+                      max={500}
+                      value={roundScores[player.id] ?? 0}
+                      onChange={(event: NumericTextBoxChangeEvent): void => {
+                        updateScore(player.id, Number(event.value ?? 0));
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           <div className="totals-section">

@@ -23,3 +23,46 @@
   align-items: center;
   padding: 0.5rem 0;
 }
+
+.draft-player-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #eee;
+}
+
+.draft-player-row.is-dealer {
+  background: #f0f6ff;
+}
+
+.draft-seat {
+  width: 1.5rem;
+  color: #888;
+  text-align: center;
+}
+
+.draft-name {
+  flex: 1;
+  font-weight: 600;
+}
+
+.dealer-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #1b64da;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid #1b64da;
+  border-radius: 4px;
+}
+
+.draft-actions {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.hint-text {
+  color: #888;
+  font-size: 0.9rem;
+}

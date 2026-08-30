@@ -81,9 +81,9 @@ function App(): JSX.Element {
   }, []);
 
   /**
-   * Creates players and a new game, then starts play.
-   */
-  const handleStartGame = (playerNames: string[]): void => {
+    * Creates players (in seating order) and a new game with the chosen dealer.
+    */
+  const handleStartGame = (playerNames: string[], dealerIndex: number): void => {
     const players: IPlayer[] = playerNames.map(
       (playerName: string): IPlayer => ({
         id: crypto.randomUUID(),
@@ -91,7 +91,7 @@ function App(): JSX.Element {
       })
     );
 
-    const game: IGame = GameService.createGame(players);
+    const game: IGame = GameService.createGame(players, dealerIndex);
 
     SessionState.setActiveGameId(game.id);
     setActiveGame(game);
@@ -101,15 +101,21 @@ function App(): JSX.Element {
   };
 
   /**
-   * Applies a round. UI updates first; the save (local + cloud) runs after.
-   * On completion the save is the important one - the final scores.
+   * Applies a round (scores + who went out first), persisting after each round.
    */
-  const handleSaveRound = (scores: IScore[]): void => {
+  const handleSaveRound = (
+    scores: IScore[],
+    wentOutPlayerId: string | null
+  ): void => {
     if (!activeGame) {
       return;
     }
 
-    const updatedGame: IGame = GameService.addRoundScores(activeGame, scores);
+    const updatedGame: IGame = GameService.addRoundScores(
+      activeGame,
+      scores,
+      wentOutPlayerId
+    );
 
     setActiveGame(updatedGame);
 

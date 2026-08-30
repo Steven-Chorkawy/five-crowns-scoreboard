@@ -43,7 +43,12 @@ export const Standings: React.FC<IStandingsProps> = (props) => {
                 className={index === 0 ? "standings-winner" : ""}
               >
                 <span className="standings-position">{index + 1}</span>
-                <span className="standings-name">{entry.player.name}</span>
+                <span className="standings-name">
+                  {entry.player.name}
+                  <small className="standings-wentout">
+                    {" "}· went out {GameService.getWentOutCount(props.game, entry.player.id)}x
+                  </small>
+                </span>
                 <strong className="standings-total">{entry.total}</strong>
               </li>
             ))}

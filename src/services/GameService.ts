@@ -4,78 +4,57 @@ import { IScore } from "../models/IScore";
 
 /**
  * Lightweight, display-ready summary of a game for the History screen.
- * Avoids recalculating standings in the component layer.
  */
 export interface IGameSummary {
-  /** Unique game identifier. */
   id: string;
-
-  /** ISO creation date of the game. */
   createdDate: string;
-
-  /** Names of every player in the game. */
   playerNames: string[];
-
-  /** Whether all 11 rounds have been completed. */
   completed: boolean;
-
-  /** The round the game is currently on (relevant for in-progress games). */
   currentRound: number;
-
-  /** Winner's name when completed; otherwise null. */
   winnerName: string | null;
-
-  /** Winner's total when completed; otherwise null. */
   winnerTotal: number | null;
 }
 
 /**
- * Contains all Five Crowns business logic.
- *
- * The service is intentionally stateless: every method takes the current game
- * (or its parts) and returns new data. This keeps the React components simple
- * and makes the rules easy to unit test later.
+ * Contains all Five Crowns business logic. Stateless: every method takes the
+ * current game (or its parts) and returns new data.
  */
 export class GameService {
 
-  /**
-   * Total number of rounds in a Five Crowns game.
-   * Round 1 deals 3 cards (3s wild) through round 11 which deals 13 (Kings wild).
-   */
+  /** Total number of rounds in a Five Crowns game. */
   public static readonly TOTAL_ROUNDS: number = 11;
 
   /**
-   * Creates a new, empty game for the supplied players.
+   * Creates a new, empty game.
    *
-   * @param players - Players participating in the game.
-   * @returns A new game positioned on round 1 with no scores recorded.
+   * @param players - Players in seating order.
+   * @param dealerStartIndex - Seating index of the round-1 dealer (default 0).
+   * @returns A new game on round 1 with no scores.
    */
-  public static createGame(players: IPlayer[]): IGame {
+  public static createGame(
+    players: IPlayer[],
+    dealerStartIndex: number = 0
+  ): IGame {
     return {
       id: crypto.randomUUID(),
       createdDate: new Date().toISOString(),
       players,
       scores: [],
+      roundResults: [],
+      dealerStartIndex,
       currentRound: 1,
       completed: false
     };
   }
 
   /**
-   * Returns the wild-card rank for a given round.
-   *
-   * The round value is clamped to the valid 1..11 range so that an unexpected
-   * out-of-range round can never produce an undefined wild card.
-   *
-   * @param round - Round number (expected 1..11).
-   * @returns The wild-card rank label for that round.
+   * Returns the wild-card rank for a given round, clamped to 1..11.
    */
   public static getWildCard(round: number): string {
     const values: string[] = [
       "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"
     ];
 
-    // Clamp to 1..TOTAL_ROUNDS, then convert to a 0-based index.
     const clampedRound: number = Math.min(
       Math.max(round, 1),
       GameService.TOTAL_ROUNDS
@@ -85,44 +64,68 @@ export class GameService {
   }
 
   /**
-   * Indicates whether the supplied round is the final round.
+   * Returns the dealer for a given round.
    *
-   * @param round - Round number to test.
-   * @returns True when the round is the last round of the game.
+   * Derived from the starting dealer plus one seat of rotation per round:
+   * dealerIndex = (dealerStartIndex + round - 1) % playerCount.
+   *
+   * Defends against older saved games that lack dealerStartIndex by defaulting
+   * it to 0.
+   *
+   * @param game - The current game.
+   * @param round - Round number (1-based).
+   * @returns The dealer for that round, or null if there are no players.
+   */
+  public static getDealer(game: IGame, round: number): IPlayer | null {
+    if (game.players.length === 0) {
+      return null;
+    }
+
+    const startIndex: number = game.dealerStartIndex ?? 0;
+    const dealerIndex: number =
+      (startIndex + (round - 1)) % game.players.length;
+
+    return game.players[dealerIndex];
+  }
+
+  /**
+   * Indicates whether the supplied round is the final round.
    */
   public static isLastRound(round: number): boolean {
     return round >= GameService.TOTAL_ROUNDS;
   }
 
   /**
-   * Appends a round's scores and advances (or completes) the game.
-   *
-   * When the current round is the final round the game is marked completed and
-   * the round counter is NOT advanced beyond the last round.
+   * Appends a round's scores plus its "went out first" result, and advances
+   * (or completes) the game.
    *
    * @param game - The current game.
    * @param scores - One score per player for the current round.
-   * @returns A new game object with the scores applied.
+   * @param wentOutPlayerId - Id of the player who went out first, or null.
+   * @returns A new game object with the round applied.
    */
-  public static addRoundScores(game: IGame, scores: IScore[]): IGame {
+  public static addRoundScores(
+    game: IGame,
+    scores: IScore[],
+    wentOutPlayerId: string | null
+  ): IGame {
     const wasLastRound: boolean = GameService.isLastRound(game.currentRound);
+    const existingResults = game.roundResults ?? [];
 
     return {
       ...game,
       scores: [...game.scores, ...scores],
-      // Only advance the round when the game is not already on the final round.
+      roundResults: [
+        ...existingResults,
+        { roundNumber: game.currentRound, wentOutPlayerId }
+      ],
       currentRound: wasLastRound ? game.currentRound : game.currentRound + 1,
-      // The game is finished once scores for the final round are recorded.
       completed: wasLastRound ? true : game.completed
     };
   }
 
   /**
-   * Calculates a single player's cumulative score across every recorded round.
-   *
-   * @param game - The current game.
-   * @param playerId - Unique identifier of the player.
-   * @returns The player's running total.
+   * Cumulative score for one player across every recorded round.
    */
   public static getPlayerTotal(game: IGame, playerId: string): number {
     return game.scores
@@ -131,12 +134,17 @@ export class GameService {
   }
 
   /**
-   * Produces the current standings sorted from best to worst.
-   *
-   * IMPORTANT: Five Crowns is won by the LOWEST total, so this sorts ascending.
-   *
-   * @param game - The current game.
-   * @returns Players paired with their totals, lowest total first.
+   * Number of rounds a player went out first. Defends against older saves that
+   * lack roundResults.
+   */
+  public static getWentOutCount(game: IGame, playerId: string): number {
+    return (game.roundResults ?? []).filter(
+      (result): boolean => result.wentOutPlayerId === playerId
+    ).length;
+  }
+
+  /**
+   * Standings sorted ascending (lowest total wins in Five Crowns).
    */
   public static getStandings(
     game: IGame
@@ -151,12 +159,6 @@ export class GameService {
 
   /**
    * Builds a display-ready summary for the History screen.
-   *
-   * For completed games the winner is the player with the LOWEST total
-   * (Five Crowns is a lowest-score-wins game), taken from getStandings.
-   *
-   * @param game - The game to summarize.
-   * @returns A summary suitable for list display.
    */
   public static getGameSummary(game: IGame): IGameSummary {
     const standings = GameService.getStandings(game);
