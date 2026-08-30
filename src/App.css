@@ -1,3 +1,53 @@
 .app-container {
-  padding: 2rem;
+  /* Center the app and cap its width so it also looks fine on desktop. */
+  max-width: 640px;
+  margin: 0 auto;
+  min-height: 100vh;
+
+  /* Pad around the iPhone notch and home indicator when installed/standalone. */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0.75rem 1rem;
+  padding-top: calc(0.75rem + env(safe-area-inset-top));
+
+  background: #1b1f3b;
+  color: #ffffff;
+
+  /* Keep the nav reachable with the thumb while scrolling. */
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.app-header-title {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.app-main {
+  padding: 0 1rem 1.5rem;
+}
+
+/* On phones, let score rows stack so the NumericTextBox is easy to tap. */
+@media (max-width: 520px) {
+  .score-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .round-card-content,
+  .standings-card-content,
+  .history-card-content,
+  .new-game-content {
+    padding: 1.25rem;
+  }
 }

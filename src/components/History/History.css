@@ -1,0 +1,61 @@
+.history-screen {
+    display: flex;
+    justify-content: center;
+    margin-top: 2rem;
+}
+
+.history-card {
+    width: 100%;
+    max-width: 800px;
+}
+
+.history-card-content {
+    padding: 2rem;
+}
+
+.history-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+}
+
+.history-empty {
+    color: #888;
+}
+
+.history-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #eee;
+}
+
+.history-row-title {
+    font-weight: 600;
+}
+
+.history-row-meta {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.history-row-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+/* On narrow (phone) screens, stack the info above the action buttons. */
+@media (max-width: 520px) {
+    .history-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .history-row-actions {
+        justify-content: flex-end;
+    }
+}

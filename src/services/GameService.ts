@@ -3,6 +3,33 @@ import { IPlayer } from "../models/IPlayer";
 import { IScore } from "../models/IScore";
 
 /**
+ * Lightweight, display-ready summary of a game for the History screen.
+ * Avoids recalculating standings in the component layer.
+ */
+export interface IGameSummary {
+  /** Unique game identifier. */
+  id: string;
+
+  /** ISO creation date of the game. */
+  createdDate: string;
+
+  /** Names of every player in the game. */
+  playerNames: string[];
+
+  /** Whether all 11 rounds have been completed. */
+  completed: boolean;
+
+  /** The round the game is currently on (relevant for in-progress games). */
+  currentRound: number;
+
+  /** Winner's name when completed; otherwise null. */
+  winnerName: string | null;
+
+  /** Winner's total when completed; otherwise null. */
+  winnerTotal: number | null;
+}
+
+/**
  * Contains all Five Crowns business logic.
  *
  * The service is intentionally stateless: every method takes the current game
@@ -120,5 +147,29 @@ export class GameService {
         total: GameService.getPlayerTotal(game, player.id)
       }))
       .sort((a, b): number => a.total - b.total);
+  }
+
+  /**
+   * Builds a display-ready summary for the History screen.
+   *
+   * For completed games the winner is the player with the LOWEST total
+   * (Five Crowns is a lowest-score-wins game), taken from getStandings.
+   *
+   * @param game - The game to summarize.
+   * @returns A summary suitable for list display.
+   */
+  public static getGameSummary(game: IGame): IGameSummary {
+    const standings = GameService.getStandings(game);
+    const leader = standings.length > 0 ? standings[0] : null;
+
+    return {
+      id: game.id,
+      createdDate: game.createdDate,
+      playerNames: game.players.map((player) => player.name),
+      completed: game.completed,
+      currentRound: game.currentRound,
+      winnerName: game.completed && leader ? leader.player.name : null,
+      winnerTotal: game.completed && leader ? leader.total : null
+    };
   }
 }
