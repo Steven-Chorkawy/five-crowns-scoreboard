@@ -14,31 +14,48 @@ import { IGame } from "./models/IGame";
 import { IScore } from "./models/IScore";
 
 import { GameService } from "./services/GameService";
-import { LocalStorageProvider } from "./services/LocalStorageProvider";
+import { CompositeProvider } from "./services/CompositeProvider";
 import { SessionState } from "./state/SessionState";
 
-// Created once at module scope rather than on every render.
-const storageProvider = new LocalStorageProvider();
+// The app now talks to the composite (local + Firestore) provider.
+const storageProvider = new CompositeProvider();
 
 /** The screen the user is currently looking at. */
 type AppView = "setup" | "playing" | "complete" | "history";
 
+/** Status of the most recent cloud save, shown in the header. */
+type SaveStatus = "idle" | "saving" | "saved" | "error";
+
 /**
- * Root component and lightweight router.
- *
- * On first load it rehydrates any game the user had open (via the device-local
- * active-game pointer) so a refresh - or reopening the app on an iPhone - never
- * loses an in-progress game.
+ * Root component and lightweight router. Persists optimistically: state updates
+ * first so the UI is instant, then the save runs and reports a cloud status.
  */
 function App(): JSX.Element {
 
   const [view, setView] = useState<AppView>("setup");
   const [activeGame, setActiveGame] = useState<IGame | null>(null);
   const [historyGames, setHistoryGames] = useState<IGame[]>([]);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
 
   /**
-   * On mount, attempt to resume whatever game was open on this device.
-   * Runs once because the dependency array is empty.
+   * Persists a game and updates the save-status indicator. Local always
+   * succeeds; a cloud failure shows "error" but the local copy is safe.
+   */
+  const persist = async (game: IGame): Promise<void> => {
+    setSaveStatus("saving");
+
+    try {
+      await storageProvider.saveGame(game);
+      setSaveStatus("saved");
+    }
+    catch (error) {
+      console.warn("Cloud save failed; kept locally.", error);
+      setSaveStatus("error");
+    }
+  };
+
+  /**
+   * On mount, resume whatever game was open on this device.
    */
   useEffect((): void => {
     const activeId: string | null = SessionState.getActiveGameId();
@@ -47,20 +64,24 @@ function App(): JSX.Element {
       return;
     }
 
-    const savedGame: IGame | null = storageProvider.loadGame(activeId);
+    // useEffect cannot be async directly, so use an inner async function.
+    const resume = async (): Promise<void> => {
+      const savedGame: IGame | null = await storageProvider.loadGame(activeId);
 
-    if (savedGame) {
-      setActiveGame(savedGame);
-      setView(savedGame.completed ? "complete" : "playing");
-    }
-    else {
-      // The pointer referenced a game that no longer exists; clear it.
-      SessionState.clearActiveGameId();
-    }
+      if (savedGame) {
+        setActiveGame(savedGame);
+        setView(savedGame.completed ? "complete" : "playing");
+      }
+      else {
+        SessionState.clearActiveGameId();
+      }
+    };
+
+    void resume();
   }, []);
 
   /**
-   * Creates players and a new game, persists it, marks it active, and starts play.
+   * Creates players and a new game, then starts play.
    */
   const handleStartGame = (playerNames: string[]): void => {
     const players: IPlayer[] = playerNames.map(
@@ -72,16 +93,16 @@ function App(): JSX.Element {
 
     const game: IGame = GameService.createGame(players);
 
-    storageProvider.saveGame(game);
     SessionState.setActiveGameId(game.id);
-
     setActiveGame(game);
     setView("playing");
+
+    void persist(game);
   };
 
   /**
-   * Applies a completed round and persists after every round so progress is
-   * never lost. Moves to the standings screen once the game completes.
+   * Applies a round. UI updates first; the save (local + cloud) runs after.
+   * On completion the save is the important one - the final scores.
    */
   const handleSaveRound = (scores: IScore[]): void => {
     if (!activeGame) {
@@ -90,12 +111,13 @@ function App(): JSX.Element {
 
     const updatedGame: IGame = GameService.addRoundScores(activeGame, scores);
 
-    storageProvider.saveGame(updatedGame);
     setActiveGame(updatedGame);
 
     if (updatedGame.completed) {
       setView("complete");
     }
+
+    void persist(updatedGame);
   };
 
   /**
@@ -104,54 +126,83 @@ function App(): JSX.Element {
   const handleNewGame = (): void => {
     SessionState.clearActiveGameId();
     setActiveGame(null);
+    setSaveStatus("idle");
     setView("setup");
   };
 
   /**
-   * Loads all saved games and shows the History screen.
+   * Loads all saved games (cloud-preferred) and shows the History screen.
    */
   const handleShowHistory = (): void => {
-    setHistoryGames(storageProvider.getGames());
-    setView("history");
+    const load = async (): Promise<void> => {
+      const games: IGame[] = await storageProvider.getGames();
+      setHistoryGames(games);
+      setView("history");
+    };
+
+    void load();
   };
 
   /**
-   * Resumes (or views) a specific saved game from history.
+   * Resumes (or views) a specific saved game.
    */
   const handleResumeGame = (id: string): void => {
-    const savedGame: IGame | null = storageProvider.loadGame(id);
+    const resume = async (): Promise<void> => {
+      const savedGame: IGame | null = await storageProvider.loadGame(id);
 
-    if (!savedGame) {
-      return;
-    }
+      if (!savedGame) {
+        return;
+      }
 
-    SessionState.setActiveGameId(id);
-    setActiveGame(savedGame);
-    setView(savedGame.completed ? "complete" : "playing");
+      SessionState.setActiveGameId(id);
+      setActiveGame(savedGame);
+      setView(savedGame.completed ? "complete" : "playing");
+    };
+
+    void resume();
   };
 
   /**
-   * Permanently deletes a saved game and refreshes the history list. If the
-   * deleted game was the active one, the active pointer is cleared too.
+   * Permanently deletes a saved game from both stores.
    */
   const handleDeleteGame = (id: string): void => {
-    storageProvider.deleteGame(id);
+    const remove = async (): Promise<void> => {
+      await storageProvider.deleteGame(id);
 
-    if (activeGame && activeGame.id === id) {
-      SessionState.clearActiveGameId();
-      setActiveGame(null);
-    }
+      if (activeGame && activeGame.id === id) {
+        SessionState.clearActiveGameId();
+        setActiveGame(null);
+      }
 
-    setHistoryGames(storageProvider.getGames());
+      const games: IGame[] = await storageProvider.getGames();
+      setHistoryGames(games);
+    };
+
+    void remove();
   };
 
   /**
-   * Renders the persistent top navigation bar.
+   * Maps the current save status to short header text.
    */
+  const renderSaveStatus = (): string => {
+    switch (saveStatus) {
+      case "saving":
+        return "Saving...";
+      case "saved":
+        return "Saved";
+      case "error":
+        return "Saved on device (offline)";
+      default:
+        return "";
+    }
+  };
+
   const renderHeader = (): JSX.Element => {
     return (
       <header className="app-header">
         <span className="app-header-title">Five Crowns</span>
+
+        <span className="app-header-status">{renderSaveStatus()}</span>
 
         {view === "history" ? (
           <Button fillMode="flat" onClick={handleNewGame}>

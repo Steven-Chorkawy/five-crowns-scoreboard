@@ -3,9 +3,9 @@ import { IGame } from "../models/IGame";
 /**
  * Defines the operations that every game storage provider must implement.
  *
- * The application initially uses localStorage. A future provider can implement
- * this same interface to connect to Firebase, SQL, Azure Functions, or another
- * API without requiring the React components to change.
+ * As of Stage 8 these are asynchronous (Promise-returning) so the same contract
+ * can be satisfied by both a synchronous store (localStorage) and an
+ * asynchronous one (Firestore, or any future REST/SQL backend).
  */
 export interface IStorageProvider {
     /**
@@ -13,7 +13,7 @@ export interface IStorageProvider {
      *
      * @param game - Complete game object to persist.
      */
-    saveGame(game: IGame): void;
+    saveGame(game: IGame): Promise<void>;
 
     /**
      * Loads one game by its unique identifier.
@@ -21,19 +21,19 @@ export interface IStorageProvider {
      * @param id - Unique identifier of the game to load.
      * @returns The matching game, or null when no matching game exists.
      */
-    loadGame(id: string): IGame | null;
+    loadGame(id: string): Promise<IGame | null>;
 
     /**
      * Returns every saved game.
      *
      * @returns Array containing all saved games.
      */
-    getGames(): IGame[];
+    getGames(): Promise<IGame[]>;
 
     /**
      * Permanently removes one game.
      *
      * @param id - Unique identifier of the game to remove.
      */
-    deleteGame(id: string): void;
+    deleteGame(id: string): Promise<void>;
 }

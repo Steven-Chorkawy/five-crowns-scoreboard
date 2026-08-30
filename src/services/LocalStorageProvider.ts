@@ -4,20 +4,17 @@ import { IStorageProvider } from "./IStorageProvider";
 /**
  * Stores Five Crowns games in the current browser's localStorage.
  *
- * This provider is intended for the proof of concept. It implements
- * IStorageProvider so that it can be replaced later by a database-backed
- * provider without changing the React components.
+ * This remains the fast, offline-safe primary store. Methods are async only to
+ * satisfy the shared IStorageProvider contract; the underlying reads and writes
+ * are still synchronous and instant.
  */
 export class LocalStorageProvider implements IStorageProvider {
     private readonly _storageKey: string = "five-crowns-games";
 
     /**
      * Returns all games currently stored in localStorage.
-     *
-     * @returns Array containing all saved games. Returns an empty array when no
-     * games have been saved or when the stored value cannot be parsed.
      */
-    public getGames(): IGame[] {
+    public async getGames(): Promise<IGame[]> {
         const value: string | null = localStorage.getItem(this._storageKey);
 
         if (!value) {
@@ -34,12 +31,10 @@ export class LocalStorageProvider implements IStorageProvider {
     }
 
     /**
-     * Creates a new saved game or replaces an existing game with the same ID.
-     *
-     * @param game - Complete game object to save.
+     * Creates a new saved game or replaces an existing game with the same id.
      */
-    public saveGame(game: IGame): void {
-        const games: IGame[] = this.getGames();
+    public async saveGame(game: IGame): Promise<void> {
+        const games: IGame[] = await this.getGames();
 
         const existingGameIndex: number = games.findIndex(
             (existingGame: IGame): boolean => existingGame.id === game.id
@@ -52,20 +47,16 @@ export class LocalStorageProvider implements IStorageProvider {
             games.push(game);
         }
 
-        localStorage.setItem(
-            this._storageKey,
-            JSON.stringify(games)
-        );
+        localStorage.setItem(this._storageKey, JSON.stringify(games));
     }
 
     /**
      * Loads one saved game by its unique identifier.
-     *
-     * @param id - Unique identifier of the game to load.
-     * @returns The matching game, or null when no matching game exists.
      */
-    public loadGame(id: string): IGame | null {
-        const game: IGame | undefined = this.getGames().find(
+    public async loadGame(id: string): Promise<IGame | null> {
+        const games: IGame[] = await this.getGames();
+
+        const game: IGame | undefined = games.find(
             (existingGame: IGame): boolean => existingGame.id === id
         );
 
@@ -74,21 +65,14 @@ export class LocalStorageProvider implements IStorageProvider {
 
     /**
      * Deletes one saved game from localStorage.
-     *
-     * @param id - Unique identifier of the game to delete.
      */
-    public deleteGame(id: string): void {
-        const games: IGame[] = this.getGames().filter(
+    public async deleteGame(id: string): Promise<void> {
+        const games: IGame[] = await this.getGames();
+
+        const remaining: IGame[] = games.filter(
             (existingGame: IGame): boolean => existingGame.id !== id
         );
 
-        localStorage.setItem(
-            this._storageKey,
-            JSON.stringify(games)
-        );
-    }
-
-    public hasSavedGames(): boolean {
-        return this.getGames().length > 0;
+        localStorage.setItem(this._storageKey, JSON.stringify(remaining));
     }
 }

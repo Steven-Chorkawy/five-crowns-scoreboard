@@ -1,0 +1,15 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Games collection: any signed-in user (including anonymous) may read and
+    // write. This blocks requests that carry no Firebase auth token at all,
+    // while keeping the app login-free for players.
+    match /games/{gameId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Everything else stays denied by default.
+  }
+}
