@@ -36,14 +36,24 @@ jobs:
         run: npm ci
 
       # Applies your commercial KendoReact license from a repo secret so the
-      # production build does not render the unlicensed watermark. The secret is
-      # created in Step 56. This value is never written to the repo.
+      # production build does not render the unlicensed watermark.
       - name: Activate KendoReact license
         env:
           KENDO_UI_LICENSE: ${{ secrets.KENDO_UI_LICENSE }}
         run: npx kendo-ui-license activate
 
+      # Single build step. The Firebase config MUST be injected here (Vite
+      # inlines VITE_* vars at build time) and this build MUST happen before the
+      # artifact is uploaded, or the deployed bundle will have undefined config
+      # and fail with auth/invalid-api-key.
       - name: Build
+        env:
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
         run: npm run build
 
       - name: Configure Pages
