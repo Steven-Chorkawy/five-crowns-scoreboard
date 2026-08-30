@@ -56,3 +56,36 @@
   border-radius: 6px;
   padding: 0.25rem 0.5rem;
 }
+
+.round-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.round-nav-label {
+  font-weight: 700;
+  font-size: 1.05rem;
+  text-align: center;
+}
+
+.editing-badge {
+  color: #b26a00;
+  font-size: 0.8rem;
+  font-weight: 700;
+  border: 1px solid #b26a00;
+  border-radius: 4px;
+  padding: 0.05rem 0.35rem;
+  margin-left: 0.35rem;
+}
+
+.jump-current-btn {
+  display: block;
+  margin: 0 auto 0.75rem;
+}
+
+.wild-line {
+  margin-top: 0;
+}

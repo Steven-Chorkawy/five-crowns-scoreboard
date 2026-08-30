@@ -20,19 +20,33 @@ export interface IRoundScreenProps {
   game: IGame;
 
   /**
-   * Raised when the round is saved.
-   *
-   * @param scores - One score per player.
-   * @param wentOutPlayerId - Player who went out first, or null.
+   * Raised when the CURRENT (not-yet-played) round is saved. Appends scores and
+   * advances the game.
    */
   onSaveRound: (scores: IScore[], wentOutPlayerId: string | null) => void;
+
+  /**
+   * Raised when an ALREADY-PLAYED round is corrected. Replaces that round's
+   * scores without advancing the game.
+   */
+  onUpdateRound: (
+    roundNumber: number,
+    scores: IScore[],
+    wentOutPlayerId: string | null
+  ) => void;
 }
 
 /**
- * Score entry for the current round, showing the dealer and letting the user
- * mark who went out first.
+ * Score entry and correction screen.
+ *
+ * Tracks `viewedRound` separately from the game's `currentRound` so the user can
+ * page back through played rounds to fix mistakes, then jump back to the current
+ * round to continue play.
  */
 export const RoundScreen: React.FC<IRoundScreenProps> = (props) => {
+
+  // The round currently displayed. Starts at the game's current round.
+  const [viewedRound, setViewedRound] = useState<number>(props.game.currentRound);
 
   const [roundScores, setRoundScores] =
     useState<Record<string, number>>({});
@@ -41,19 +55,31 @@ export const RoundScreen: React.FC<IRoundScreenProps> = (props) => {
     useState<string | null>(null);
 
   /**
-   * Reset per-player values and the went-out selection whenever the round
-   * changes.
+   * When the game's current round advances (a new round was played), follow it
+   * so the user lands on the fresh round. Editing a past round does NOT change
+   * currentRound, so this does not fire during edits.
    */
   useEffect((): void => {
-    const startingScores: Record<string, number> = {};
+    setViewedRound(props.game.currentRound);
+  }, [props.game.currentRound]);
 
+  /**
+   * Seed the entry fields whenever the viewed round (or underlying scores)
+   * changes: from existing scores when editing a played round, or zeros for the
+   * current unplayed round.
+   */
+  useEffect((): void => {
+    const existing: Record<string, number> =
+      GameService.getRoundScores(props.game, viewedRound);
+
+    const seeded: Record<string, number> = {};
     props.game.players.forEach((player: IPlayer): void => {
-      startingScores[player.id] = 0;
+      seeded[player.id] = existing[player.id] ?? 0;
     });
 
-    setRoundScores(startingScores);
-    setWentOutPlayerId(null);
-  }, [props.game.currentRound, props.game.players]);
+    setRoundScores(seeded);
+    setWentOutPlayerId(GameService.getWentOutForRound(props.game, viewedRound));
+  }, [viewedRound, props.game.players, props.game.scores]);
 
   /**
    * Updates a single player's entry value (computed key so each player maps to
@@ -67,9 +93,8 @@ export const RoundScreen: React.FC<IRoundScreenProps> = (props) => {
   };
 
   /**
-   * Toggles which player went out first. Selecting a player also sets their
-   * score to 0 for convenience (going out scores zero); it stays editable.
-   * Clicking the already-selected player clears the selection.
+   * Toggles which player went out first; selecting one sets their score to 0
+   * (still editable). Clicking the selected player again clears it.
    */
   const markWentOut = (playerId: string): void => {
     setWentOutPlayerId((current) => {
@@ -83,32 +108,107 @@ export const RoundScreen: React.FC<IRoundScreenProps> = (props) => {
   };
 
   /**
-   * Builds scores + went-out result and raises onSaveRound.
+   * Builds the scores array for the viewed round.
    */
-  const saveRound = (): void => {
-    const scores: IScore[] = props.game.players.map(
+  const buildScores = (): IScore[] => {
+    return props.game.players.map(
       (player: IPlayer): IScore => ({
         playerId: player.id,
-        roundNumber: props.game.currentRound,
+        roundNumber: viewedRound,
         score: roundScores[player.id] ?? 0
       })
     );
-
-    props.onSaveRound(scores, wentOutPlayerId);
   };
 
-  const wildCard: string = GameService.getWildCard(props.game.currentRound);
-  const isFinalRound: boolean = GameService.isLastRound(props.game.currentRound);
-  const dealer: IPlayer | null =
-    GameService.getDealer(props.game, props.game.currentRound);
+  // True when the viewed round already has scores (i.e. we are editing).
+  const isEditing: boolean =
+    GameService.hasRoundBeenScored(props.game, viewedRound);
+
+  /**
+   * Primary action. Editing a played round replaces it; the current unplayed
+   * round is appended and advances the game.
+   */
+  const handlePrimary = (): void => {
+    const scores: IScore[] = buildScores();
+
+    if (isEditing) {
+      props.onUpdateRound(viewedRound, scores, wentOutPlayerId);
+    }
+    else {
+      props.onSaveRound(scores, wentOutPlayerId);
+    }
+  };
+
+  const goPrev = (): void => {
+    setViewedRound((round) => Math.max(1, round - 1));
+  };
+
+  const goNext = (): void => {
+    setViewedRound((round) => Math.min(props.game.currentRound, round + 1));
+  };
+
+  const jumpToCurrent = (): void => {
+    setViewedRound(props.game.currentRound);
+  };
+
+  const wildCard: string = GameService.getWildCard(viewedRound);
+  const dealer: IPlayer | null = GameService.getDealer(props.game, viewedRound);
+
+  const isViewingCurrent: boolean = viewedRound === props.game.currentRound;
+  const isFinalCurrentRound: boolean =
+    isViewingCurrent && GameService.isLastRound(viewedRound);
+
+  const primaryLabel: string = isEditing
+    ? "Update Round"
+    : isFinalCurrentRound
+      ? "Finish Game"
+      : "Save Round";
 
   return (
     <div className="round-screen">
       <Card className="round-card">
         <div className="round-card-content">
 
-          <h2>Round {props.game.currentRound} of {GameService.TOTAL_ROUNDS}</h2>
-          <h3>Wild Card: {wildCard}</h3>
+          <div className="round-nav">
+            <Button
+              size="small"
+              fillMode="outline"
+              disabled={viewedRound <= 1}
+              onClick={goPrev}
+            >
+              ← Prev
+            </Button>
+
+            <span className="round-nav-label">
+              Round {viewedRound} of {GameService.TOTAL_ROUNDS}
+              {isEditing && !isViewingCurrent && (
+                <span className="editing-badge"> Editing</span>
+              )}
+            </span>
+
+            <Button
+              size="small"
+              fillMode="outline"
+              disabled={viewedRound >= props.game.currentRound}
+              onClick={goNext}
+            >
+              Next →
+            </Button>
+          </div>
+
+          {!isViewingCurrent && (
+            <Button
+              size="small"
+              themeColor="info"
+              fillMode="flat"
+              className="jump-current-btn"
+              onClick={jumpToCurrent}
+            >
+              Jump to current round (Round {props.game.currentRound})
+            </Button>
+          )}
+
+          <h3 className="wild-line">Wild Card: {wildCard}</h3>
 
           {dealer && (
             <p className="dealer-line">
@@ -166,8 +266,8 @@ export const RoundScreen: React.FC<IRoundScreenProps> = (props) => {
             ))}
           </div>
 
-          <Button themeColor="primary" onClick={saveRound}>
-            {isFinalRound ? "Finish Game" : "Save Round"}
+          <Button themeColor="primary" onClick={handlePrimary}>
+            {primaryLabel}
           </Button>
 
         </div>

@@ -127,6 +127,30 @@ function App(): JSX.Element {
   };
 
   /**
+  * Applies a correction to an already-played round (replace, do not advance),
+  * then persists.
+  */
+  const handleUpdateRound = (
+    roundNumber: number,
+    scores: IScore[],
+    wentOutPlayerId: string | null
+  ): void => {
+    if (!activeGame) {
+      return;
+    }
+
+    const updatedGame: IGame = GameService.updateRoundScores(
+      activeGame,
+      roundNumber,
+      scores,
+      wentOutPlayerId
+    );
+
+    setActiveGame(updatedGame);
+    void persist(updatedGame);
+  };
+
+  /**
    * Clears the active game and returns to the New Game screen.
    */
   const handleNewGame = (): void => {
@@ -242,7 +266,11 @@ function App(): JSX.Element {
         )}
 
         {view === "playing" && activeGame && (
-          <RoundScreen game={activeGame} onSaveRound={handleSaveRound} />
+          <RoundScreen
+            game={activeGame}
+            onSaveRound={handleSaveRound}
+            onUpdateRound={handleUpdateRound}
+          />
         )}
 
         {view === "setup" && (

@@ -174,4 +174,97 @@ export class GameService {
       winnerTotal: game.completed && leader ? leader.total : null
     };
   }
+
+  /**
+  * Returns true if the given round already has any scores recorded.
+  *
+  * The only round without scores during play is the current, not-yet-played
+  * round; every earlier round has been scored.
+  *
+  * @param game - The current game.
+  * @param roundNumber - Round to check.
+  */
+  public static hasRoundBeenScored(game: IGame, roundNumber: number): boolean {
+    return game.scores.some(
+      (score: IScore): boolean => score.roundNumber === roundNumber
+    );
+  }
+
+  /**
+   * Returns a player-id -> score map for the given round (only players who have
+   * a recorded score for that round appear).
+   *
+   * @param game - The current game.
+   * @param roundNumber - Round to read.
+   */
+  public static getRoundScores(
+    game: IGame,
+    roundNumber: number
+  ): Record<string, number> {
+    const map: Record<string, number> = {};
+
+    game.scores
+      .filter((score: IScore): boolean => score.roundNumber === roundNumber)
+      .forEach((score: IScore): void => {
+        map[score.playerId] = score.score;
+      });
+
+    return map;
+  }
+
+  /**
+   * Returns the id of the player who went out first in the given round, or null.
+   *
+   * @param game - The current game.
+   * @param roundNumber - Round to read.
+   */
+  public static getWentOutForRound(
+    game: IGame,
+    roundNumber: number
+  ): string | null {
+    const result = (game.roundResults ?? []).find(
+      (item): boolean => item.roundNumber === roundNumber
+    );
+
+    return result ? result.wentOutPlayerId : null;
+  }
+
+  /**
+   * Replaces the scores and the "went out" result for a single round WITHOUT
+   * advancing the game. Use this for corrections to an already-played round.
+   *
+   * Any existing scores/result for that round are removed and replaced, so this
+   * cannot create duplicate rows for the same round.
+   *
+   * @param game - The current game.
+   * @param roundNumber - Round being edited.
+   * @param scores - Replacement scores (one per player) for that round.
+   * @param wentOutPlayerId - Replacement "went out first" id, or null.
+   * @returns A new game with the round corrected; currentRound and completed
+   *          are unchanged.
+   */
+  public static updateRoundScores(
+    game: IGame,
+    roundNumber: number,
+    scores: IScore[],
+    wentOutPlayerId: string | null
+  ): IGame {
+    const otherScores = game.scores.filter(
+      (score: IScore): boolean => score.roundNumber !== roundNumber
+    );
+
+    const otherResults = (game.roundResults ?? []).filter(
+      (item): boolean => item.roundNumber !== roundNumber
+    );
+
+    return {
+      ...game,
+      scores: [...otherScores, ...scores],
+      roundResults: [
+        ...otherResults,
+        { roundNumber, wentOutPlayerId }
+      ]
+      // currentRound and completed intentionally unchanged.
+    };
+  }
 }
