@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-import { Button, Chip, ChipList } from "@progress/kendo-react-buttons";
+import { Button, ChipList } from "@progress/kendo-react-buttons";
 import { Input } from "@progress/kendo-react-inputs";
 import { Card } from "@progress/kendo-react-layout";
 
