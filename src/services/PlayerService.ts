@@ -144,4 +144,30 @@ export class PlayerService {
       totalZeroRounds
     };
   }
+
+  /**
+   * Returns the player's BEST completed game - the completed game in which they
+   * had the lowest total (their best Five Crowns result) - or null if they have
+   * no completed games.
+   *
+   * @param id - Stable roster id of the player.
+   */
+  public async getPlayerBestGame(id: string): Promise<IGame | null> {
+    const allGames: IGame[] = await this._games.getGames();
+
+    const completed: IGame[] = allGames.filter(
+      (game) => game.completed && game.players.some((p) => p.id === id)
+    );
+
+    if (completed.length === 0) {
+      return null;
+    }
+
+    // Choose the game where this player's total is smallest.
+    return completed.reduce((best, game) => {
+      const bestTotal = GameService.getPlayerTotal(best, id);
+      const gameTotal = GameService.getPlayerTotal(game, id);
+      return gameTotal < bestTotal ? game : best;
+    });
+  }
 }

@@ -1,0 +1,51 @@
+.players-screen {
+    display: flex;
+    justify-content: center;
+    margin-top: 1.5rem;
+}
+
+.players-card {
+    width: 100%;
+    max-width: 600px;
+}
+
+.players-content {
+    padding: 1.5rem;
+}
+
+.players-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.player-list-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0.9rem 0.5rem;
+    border: none;
+    border-bottom: 1px solid #eee;
+    background: transparent;
+    font: inherit;
+    cursor: pointer;
+    text-align: left;
+}
+
+.player-list-row:hover {
+    background: #f6f8fc;
+}
+
+.player-list-name {
+    font-weight: 600;
+}
+
+.player-list-chevron {
+    color: #aaa;
+    font-size: 1.2rem;
+}
+
+.hint-text {
+    color: #888;
+}

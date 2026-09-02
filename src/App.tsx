@@ -9,7 +9,10 @@ import { RoundScreen } from "./components/RoundScreen/RoundScreen";
 import { Standings } from "./components/Standings/Standings";
 import { History } from "./components/History/History";
 import { GameDetail } from "./components/GameDetail/GameDetail";
+import { Players } from "./components/Players/Players";
+import { PlayerStats } from "./components/PlayerStats/PlayerStats";
 
+import { IPlayerStats } from "./models/IPlayerStats";
 import { IPlayer } from "./models/IPlayer";
 import { IGame } from "./models/IGame";
 import { IScore } from "./models/IScore";
@@ -28,7 +31,14 @@ const playerRepository = new LocalPlayerRepository();
 const playerService = new PlayerService(playerRepository, storageProvider);
 
 /** The screen the user is currently looking at. */
-type AppView = "setup" | "playing" | "complete" | "history" | "detail";
+type AppView =
+  | "setup"
+  | "playing"
+  | "complete"
+  | "history"
+  | "detail"
+  | "players"
+  | "playerStats";
 
 /** Status of the most recent cloud save, shown in the header. */
 type SaveStatus = "idle" | "saving" | "saved" | "error";
@@ -45,6 +55,13 @@ function App(): JSX.Element {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [detailGame, setDetailGame] = useState<IGame | null>(null);
   const [rosterPlayers, setRosterPlayers] = useState<IPlayer[]>([]);
+  // Roster shown on the Players list screen.
+  const [statsRoster, setStatsRoster] = useState<IPlayer[]>([]);
+  // Currently selected player's computed stats and best game.
+  const [selectedStats, setSelectedStats] = useState<IPlayerStats | null>(null);
+  const [selectedBestGame, setSelectedBestGame] = useState<IGame | null>(null);
+  // Simple loading flag for the async stats fetch.
+  const [statsLoading, setStatsLoading] = useState<boolean>(false);
 
   /**
    * Persists a game and updates the save-status indicator. Local always
@@ -255,6 +272,48 @@ function App(): JSX.Element {
     handleShowHistory();
   };
 
+  /**
+ * Opens the Players list, loading the current roster.
+ */
+  const handleShowPlayers = (): void => {
+    const load = async (): Promise<void> => {
+      setStatsRoster(await playerService.getAllPlayers());
+      setView("players");
+    };
+
+    void load();
+  };
+
+  /**
+   * Opens a player's stats screen, fetching their stats and best game.
+   */
+  const handleSelectPlayer = (id: string): void => {
+    const load = async (): Promise<void> => {
+      setStatsLoading(true);
+      setView("playerStats");
+
+      const [stats, bestGame] = await Promise.all([
+        playerService.getPlayerStats(id),
+        playerService.getPlayerBestGame(id)
+      ]);
+
+      setSelectedStats(stats);
+      setSelectedBestGame(bestGame);
+      setStatsLoading(false);
+    };
+
+    void load();
+  };
+
+  /**
+   * Returns from stats to the players list.
+   */
+  const handleBackToPlayers = (): void => {
+    setSelectedStats(null);
+    setSelectedBestGame(null);
+    handleShowPlayers();
+  };
+
 
   /**
    * Maps the current save status to short header text.
@@ -278,6 +337,10 @@ function App(): JSX.Element {
         <span className="app-header-title">Five Crowns</span>
 
         <span className="app-header-status">{renderSaveStatus()}</span>
+
+        <Button fillMode="flat" onClick={handleShowPlayers}>
+          Players
+        </Button>
 
         {view === "history" ? (
           <Button fillMode="flat" onClick={handleNewGame}>
@@ -329,6 +392,26 @@ function App(): JSX.Element {
             onCreatePlayer={(name: string) => playerService.addPlayer(name)}
             onStartGame={handleStartGame}
           />
+        )}
+
+        {view === "players" && (
+          <Players
+            players={statsRoster}
+            onSelect={handleSelectPlayer}
+            onBack={handleNewGame}
+          />
+        )}
+
+        {view === "playerStats" && (
+          statsLoading || !selectedStats ? (
+            <p className="loading-line">Loading stats…</p>
+          ) : (
+            <PlayerStats
+              stats={selectedStats}
+              bestGame={selectedBestGame}
+              onBack={handleBackToPlayers}
+            />
+          )
         )}
       </main>
     </div>
