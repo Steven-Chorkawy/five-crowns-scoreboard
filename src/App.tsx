@@ -16,10 +16,16 @@ import { IScore } from "./models/IScore";
 
 import { GameService } from "./services/GameService";
 import { CompositeProvider } from "./services/CompositeProvider";
+import { LocalPlayerRepository } from "./services/LocalPlayerRepository";
+import { PlayerService } from "./services/PlayerService";
 import { SessionState } from "./state/SessionState";
 
 // The app now talks to the composite (local + Firestore) provider.
 const storageProvider = new CompositeProvider();
+
+// Roster + player stats. Reuses the existing composite games store for stats.
+const playerRepository = new LocalPlayerRepository();
+const playerService = new PlayerService(playerRepository, storageProvider);
 
 /** The screen the user is currently looking at. */
 type AppView = "setup" | "playing" | "complete" | "history" | "detail";
@@ -38,6 +44,7 @@ function App(): JSX.Element {
   const [historyGames, setHistoryGames] = useState<IGame[]>([]);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [detailGame, setDetailGame] = useState<IGame | null>(null);
+  const [rosterPlayers, setRosterPlayers] = useState<IPlayer[]>([]);
 
   /**
    * Persists a game and updates the save-status indicator. Local always
@@ -83,16 +90,26 @@ function App(): JSX.Element {
   }, []);
 
   /**
-    * Creates players (in seating order) and a new game with the chosen dealer.
-    */
-  const handleStartGame = (playerNames: string[], dealerIndex: number): void => {
-    const players: IPlayer[] = playerNames.map(
-      (playerName: string): IPlayer => ({
-        id: crypto.randomUUID(),
-        name: playerName
-      })
-    );
+   * Loads the roster whenever we return to the setup screen so newly created
+   * players appear as chips.
+   */
+  useEffect((): void => {
+    if (view !== "setup") {
+      return;
+    }
 
+    const load = async (): Promise<void> => {
+      setRosterPlayers(await playerService.getAllPlayers());
+    };
+
+    void load();
+  }, [view]);
+
+  /**
+ * Starts a new game from the chosen players (already carrying stable roster
+ * ids) in seating order, with the chosen dealer.
+ */
+  const handleStartGame = (players: IPlayer[], dealerIndex: number): void => {
     const game: IGame = GameService.createGame(players, dealerIndex);
 
     SessionState.setActiveGameId(game.id);
@@ -307,7 +324,11 @@ function App(): JSX.Element {
         )}
 
         {view === "setup" && (
-          <NewGame onStartGame={handleStartGame} />
+          <NewGame
+            rosterPlayers={rosterPlayers}
+            onCreatePlayer={(name: string) => playerService.addPlayer(name)}
+            onStartGame={handleStartGame}
+          />
         )}
       </main>
     </div>

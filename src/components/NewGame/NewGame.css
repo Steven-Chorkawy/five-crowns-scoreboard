@@ -66,3 +66,13 @@
   color: #888;
   font-size: 0.9rem;
 }
+
+.roster-section {
+  margin-bottom: 1rem;
+}
+
+.roster-section .k-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}

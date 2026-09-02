@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 
-import { Button } from "@progress/kendo-react-buttons";
+import { Button, Chip, ChipList } from "@progress/kendo-react-buttons";
 import { Input } from "@progress/kendo-react-inputs";
 import { Card } from "@progress/kendo-react-layout";
+
+import { IPlayer } from "../../models/IPlayer";
 
 import "./NewGame.css";
 
@@ -10,127 +12,140 @@ import "./NewGame.css";
  * Props for the NewGame setup screen.
  */
 export interface INewGameProps {
+  /** Returning players available to pick from the roster. */
+  rosterPlayers: IPlayer[];
+
+  /**
+   * Creates (or reuses) a roster player by name and returns it with a stable
+   * id. Called when the user types a brand-new name.
+   */
+  onCreatePlayer: (name: string) => Promise<IPlayer>;
+
   /**
    * Raised when the game starts.
    *
-   * @param playerNames - Names in final seating order.
-   * @param dealerIndex - Index (into playerNames) of the round-1 dealer.
+   * @param players - Chosen players (with stable ids) in seating order.
+   * @param dealerIndex - Index (into players) of the round-1 dealer.
    */
-  onStartGame: (playerNames: string[], dealerIndex: number) => void;
+  onStartGame: (players: IPlayer[], dealerIndex: number) => void;
 }
 
 /**
- * A player being drafted during setup. Uses a temporary id so reordering and
- * dealer selection stay correct even if two players share a name.
- */
-interface IDraftPlayer {
-  tempId: string;
-  name: string;
-}
-
-/**
- * Player setup: add names, reorder to match table seating, and pick the first
- * dealer. Requires at least two players to start.
+ * Player setup: pick returning players from a ChipList or add a new name, order
+ * them to match table seating, and choose the first dealer.
  */
 export const NewGame: React.FC<INewGameProps> = (props) => {
 
-  const [players, setPlayers] = useState<IDraftPlayer[]>([]);
-  const [playerName, setPlayerName] = useState<string>("");
-  const [dealerTempId, setDealerTempId] = useState<string | null>(null);
+  // Players selected for THIS game, in seating order.
+  const [seating, setSeating] = useState<IPlayer[]>([]);
+
+  // Stable id of the round-1 dealer.
+  const [dealerId, setDealerId] = useState<string | null>(null);
+
+  const [nameInput, setNameInput] = useState<string>("");
+
+  // Roster players not already seated become the available chips.
+  const availablePlayers: IPlayer[] = props.rosterPlayers.filter(
+    (rosterPlayer) => !seating.some((s) => s.id === rosterPlayer.id)
+  );
 
   /**
-   * Adds a trimmed, non-empty name. The first player added becomes the default
-   * dealer (changeable).
+   * Adds a player to the seating list and defaults them as dealer if first.
    */
-  const addPlayer = (): void => {
-    const trimmedName: string = playerName.trim();
+  const addToSeating = (player: IPlayer): void => {
+    setSeating((previous) => {
+      if (previous.some((p) => p.id === player.id)) {
+        return previous;
+      }
+      return [...previous, player];
+    });
 
-    if (!trimmedName) {
-      return;
-    }
-
-    const newPlayer: IDraftPlayer = {
-      tempId: crypto.randomUUID(),
-      name: trimmedName
-    };
-
-    setPlayers((previous) => [...previous, newPlayer]);
-
-    // Default the dealer to the first player added.
-    setDealerTempId((current) => current ?? newPlayer.tempId);
-
-    setPlayerName("");
+    setDealerId((current) => current ?? player.id);
   };
 
   /**
-   * Removes a player. If the removed player was the dealer, the dealer resets
-   * to the first remaining player (or null if none remain).
+   * Handles selecting a returning player chip. The ChipList is used as a picker:
+   * selecting a chip adds that player and the selection is cleared.
    */
-  const removePlayer = (tempId: string): void => {
-    setPlayers((previous) => {
-      const remaining = previous.filter((p) => p.tempId !== tempId);
+  const handleChipSelect = (event: { value: unknown }): void => {
+    // Kendo ChipList onChange returns the selected chip value(s). We treat any
+    // selected value as an "add" and immediately clear selection.
+    const selectedIds: string[] = Array.isArray(event.value)
+      ? (event.value as string[])
+      : event.value
+        ? [event.value as string]
+        : [];
 
-      if (dealerTempId === tempId) {
-        setDealerTempId(remaining.length > 0 ? remaining[0].tempId : null);
+    selectedIds.forEach((id) => {
+      const player = availablePlayers.find((p) => p.id === id);
+      if (player) {
+        addToSeating(player);
       }
-
-      return remaining;
     });
   };
 
   /**
-   * Swaps a player with the one above it (moves them earlier in seating order).
+   * Adds a brand-new player by name (persists to the roster, then seats them).
    */
+  const addNewName = async (): Promise<void> => {
+    const trimmed: string = nameInput.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    const player: IPlayer = await props.onCreatePlayer(trimmed);
+    addToSeating(player);
+    setNameInput("");
+  };
+
+  /**
+   * Removes a player from seating; if they were the dealer, reassign to the
+   * first remaining player (or null).
+   */
+  const removeFromSeating = (id: string): void => {
+    setSeating((previous) => {
+      const remaining = previous.filter((p) => p.id !== id);
+      if (dealerId === id) {
+        setDealerId(remaining.length > 0 ? remaining[0].id : null);
+      }
+      return remaining;
+    });
+  };
+
+  /** Moves a seated player one place earlier. */
   const moveUp = (index: number): void => {
     if (index <= 0) {
       return;
     }
-
-    setPlayers((previous) => {
+    setSeating((previous) => {
       const next = [...previous];
       [next[index - 1], next[index]] = [next[index], next[index - 1]];
       return next;
     });
   };
 
-  /**
-   * Swaps a player with the one below it (moves them later in seating order).
-   */
+  /** Moves a seated player one place later. */
   const moveDown = (index: number): void => {
-    setPlayers((previous) => {
+    setSeating((previous) => {
       if (index >= previous.length - 1) {
         return previous;
       }
-
       const next = [...previous];
       [next[index], next[index + 1]] = [next[index + 1], next[index]];
       return next;
     });
   };
 
-  /**
-   * Marks a player as the round-1 dealer.
-   */
-  const setDealer = (tempId: string): void => {
-    setDealerTempId(tempId);
-  };
-
-  /**
-   * Starts the game, passing names in order and the dealer's index.
-   */
+  /** Starts the game with the seated players and the chosen dealer index. */
   const startGame = (): void => {
-    const names: string[] = players.map((p) => p.name);
-
-    // Resolve dealer temp id to an index; default to 0 if somehow unset.
     const dealerIndex: number = Math.max(
       0,
-      players.findIndex((p) => p.tempId === dealerTempId)
+      seating.findIndex((p) => p.id === dealerId)
     );
-
-    props.onStartGame(names, dealerIndex);
+    props.onStartGame(seating, dealerIndex);
   };
 
-  const canStart: boolean = players.length >= 2;
+  const canStart: boolean = seating.length >= 2;
 
   return (
     <Card className="new-game-card">
@@ -138,39 +153,59 @@ export const NewGame: React.FC<INewGameProps> = (props) => {
 
         <h2>New Game</h2>
 
+        {/* Returning players */}
+        <div className="roster-section">
+          <h3>Returning players</h3>
+
+          {availablePlayers.length === 0 ? (
+            <p className="hint-text">
+              No saved players yet. Add players below.
+            </p>
+          ) : (
+            <ChipList
+              selection="single"
+              onChange={handleChipSelect}
+              data={availablePlayers.map((player) => ({
+                text: player.name,
+                value: player.id
+              }))}
+            />
+          )}
+        </div>
+
+        {/* New player entry */}
         <div className="player-entry-row">
           <Input
-            value={playerName}
-            placeholder="Player Name"
-            onChange={(event) => setPlayerName(String(event.value ?? ""))}
+            value={nameInput}
+            placeholder="New player name"
+            onChange={(event) => setNameInput(String(event.value ?? ""))}
             onKeyDown={(event) => {
               if (event.key === "Enter") {
-                addPlayer();
+                void addNewName();
               }
             }}
           />
-          <Button themeColor="primary" onClick={addPlayer}>
-            Add Player
+          <Button themeColor="primary" onClick={() => void addNewName()}>
+            Add
           </Button>
         </div>
 
+        {/* Seating order */}
         <div className="players-section">
           <h3>Players (seating order)</h3>
 
-          {players.length === 0 && <p>No players added yet.</p>}
+          {seating.length === 0 && <p className="hint-text">No players added yet.</p>}
 
-          {players.map((player, index) => {
-            const isDealer: boolean = player.tempId === dealerTempId;
+          {seating.map((player, index) => {
+            const isDealer: boolean = player.id === dealerId;
 
             return (
               <div
-                key={player.tempId}
+                key={player.id}
                 className={`draft-player-row ${isDealer ? "is-dealer" : ""}`}
               >
                 <span className="draft-seat">{index + 1}</span>
-
                 <span className="draft-name">{player.name}</span>
-
                 {isDealer && <span className="dealer-badge">Dealer</span>}
 
                 <div className="draft-actions">
@@ -183,31 +218,28 @@ export const NewGame: React.FC<INewGameProps> = (props) => {
                   >
                     ↑
                   </Button>
-
                   <Button
                     size="small"
                     fillMode="outline"
-                    disabled={index === players.length - 1}
+                    disabled={index === seating.length - 1}
                     onClick={() => moveDown(index)}
                     aria-label="Move down"
                   >
                     ↓
                   </Button>
-
                   <Button
                     size="small"
                     fillMode={isDealer ? "solid" : "outline"}
                     themeColor={isDealer ? "primary" : "base"}
-                    onClick={() => setDealer(player.tempId)}
+                    onClick={() => setDealerId(player.id)}
                   >
                     Dealer
                   </Button>
-
                   <Button
                     size="small"
                     fillMode="outline"
                     themeColor="error"
-                    onClick={() => removePlayer(player.tempId)}
+                    onClick={() => removeFromSeating(player.id)}
                   >
                     Remove
                   </Button>
@@ -217,11 +249,7 @@ export const NewGame: React.FC<INewGameProps> = (props) => {
           })}
         </div>
 
-        <Button
-          themeColor="success"
-          disabled={!canStart}
-          onClick={startGame}
-        >
+        <Button themeColor="success" disabled={!canStart} onClick={startGame}>
           Start Game
         </Button>
 
