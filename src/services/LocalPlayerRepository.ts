@@ -57,6 +57,29 @@ export class LocalPlayerRepository implements IPlayerRepository {
     return created;
   }
 
+  /**
+  * Creates or overwrites a player by id. Used by CompositePlayerRepository so
+  * the local and cloud copies share one identical id.
+  *
+  * @param player - The complete player record to persist.
+  */
+  public async save(player: IPlayer): Promise<void> {
+    const players: IPlayer[] = this.read();
+    const index: number = players.findIndex(
+      (existing) => existing.id === player.id
+    );
+
+    if (index >= 0) {
+      // Replace in place so we never create a duplicate roster row.
+      players[index] = player;
+    }
+    else {
+      players.push(player);
+    }
+
+    this.write(players);
+  }
+
   public async rename(id: string, newName: string): Promise<void> {
     const players: IPlayer[] = this.read().map((player) =>
       player.id === id ? { ...player, name: newName.trim() } : player

@@ -19,15 +19,16 @@ import { IScore } from "./models/IScore";
 
 import { GameService } from "./services/GameService";
 import { CompositeProvider } from "./services/CompositeProvider";
-import { LocalPlayerRepository } from "./services/LocalPlayerRepository";
+import { CompositePlayerRepository } from "./services/CompositePlayerRepository";
 import { PlayerService } from "./services/PlayerService";
 import { SessionState } from "./state/SessionState";
 
 // The app now talks to the composite (local + Firestore) provider.
 const storageProvider = new CompositeProvider();
 
-// Roster + player stats. Reuses the existing composite games store for stats.
-const playerRepository = new LocalPlayerRepository();
+// Roster + player stats. The roster is now local + Firestore, matching the
+// games store, so players and their ids are the same on every device.
+const playerRepository = new CompositePlayerRepository();
 const playerService = new PlayerService(playerRepository, storageProvider);
 
 /** The screen the user is currently looking at. */
@@ -121,6 +122,24 @@ function App(): JSX.Element {
 
     void load();
   }, [view]);
+
+  /**
+ * One-time roster migration. Any player that exists only in this device's
+ * localStorage (created before Stage 15, or while offline) is pushed to
+ * Firestore using their EXISTING id, so historical games keep resolving to
+ * the right person. Idempotent and safe on every start.
+ */
+  useEffect((): void => {
+    const migrate = async (): Promise<void> => {
+      const uploaded: number = await playerRepository.migrateLocalToCloud();
+
+      if (uploaded > 0) {
+        console.info(`Migrated ${uploaded} player(s) to the cloud roster.`);
+      }
+    };
+
+    void migrate();
+  }, []);
 
   /**
  * Starts a new game from the chosen players (already carrying stable roster

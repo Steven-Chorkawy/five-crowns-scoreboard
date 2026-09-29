@@ -18,6 +18,19 @@ export interface IPlayerRepository {
    */
   addByName(name: string): Promise<IPlayer>;
 
+  /**
+   * Creates or overwrites a player using an id that the CALLER has already
+   * decided.
+   *
+   * This is what makes a composite (local + cloud) roster possible: the
+   * composite mints the id once, then writes the identical IPlayer object to
+   * every underlying store. Without it, each store would call addByName and
+   * generate its own conflicting id for the same person.
+   *
+   * @param player - The complete player record to persist.
+   */
+  save(player: IPlayer): Promise<void>;
+
   /** Renames a player. */
   rename(id: string, newName: string): Promise<void>;
 
